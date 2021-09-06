@@ -13,9 +13,9 @@ namespace AndyLuDemo
         {
             Console.WriteLine("Hello World!");
             TaskRunnerBase run = 
-                // new AndyLuBasicTaskRunner1();
+                new AndyLuBasicTaskRunner1();
                 // new AndyLuBasicTaskRunner2();
-                new AndyLuTaskThreadRunner1();
+                // new AndyLuTaskThreadRunner1();
                 // new AndyLuTaskThreadRunner2();
                 // new AndyLuPipelineRunner1();
                 // new AndyLuPipelineRunner2();
