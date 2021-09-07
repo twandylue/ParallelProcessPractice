@@ -57,7 +57,7 @@ namespace AndyLuDemo
         }
     }
 
-    // pipline + counts(精準) + thread pool + recycle list
+    // pipline + counts(精準) + thread pool + release list
     public class AndyLuPipelineRunner1 : TaskRunnerBase
     {
         public override void Run(IEnumerable<MyTask> tasks)
@@ -110,11 +110,11 @@ namespace AndyLuDemo
         }
     }
 
-    // pipline + CocurrentQueue + thread pool + lock
+    // pipline + CocurrentQueue + thread pool + lock + counter
     public class AndyLuPipelineRunner2 : TaskRunnerBase
     {
         private readonly object _lock = new Object();
-        private int[] step_done = { 0, 0, 0, 0 };
+        private volatile int[] task_step_done = { 0, 0, 0, 0 };
         private int total_tasks = 30;
         private ConcurrentQueue<MyTask>[] queues = new ConcurrentQueue<MyTask>[3 + 1] {
             null,
@@ -125,14 +125,14 @@ namespace AndyLuDemo
         private void DoAllStepN(object step_value)
         {
             int step = (int)step_value;
-            while (step_done[step] < total_tasks)
+            while (task_step_done[step] < total_tasks)
             {
                 if (this.queues[step].TryDequeue(out MyTask task))
                 {
                     task.DoStepN(step);
                     lock (_lock)
                     {
-                        step_done[step] += 1;
+                        task_step_done[step] += 1;
                     }
                     if (step < 3) this.queues[step + 1].Enqueue(task);
 
@@ -196,7 +196,7 @@ namespace AndyLuDemo
         }
     }
 
-    // pipeline + counts(精準) + TPL + recycle list
+    // pipeline + counts(精準) + TPL + release list
     public class AndyLuPipelineRunner4 : TaskRunnerBase
     {
         private BlockingCollection<MyTask>[] queues = new BlockingCollection<MyTask>[3 + 1] {
@@ -248,11 +248,11 @@ namespace AndyLuDemo
         }
     }
 
-    // pipeline + counts(不精準) + TPL + lock
+    // pipeline + counts(不精準) + TPL + lock + counter
     public class AndyLuPipelineRunner5 : TaskRunnerBase
     {
-        private int[] task_counts = { 0, 0, 0, 0 };
-        private int task_upperlimit = 30;
+        private int[] task_step_done = { 0, 0, 0, 0 };
+        private int total_task = 30;
         private object _lock = new object();
         private BlockingCollection<MyTask>[] queues = new BlockingCollection<MyTask>[3 + 1] {
             null,
@@ -268,8 +268,8 @@ namespace AndyLuDemo
                 task.DoStepN(step);
                 lock (_lock)
                 {
-                    task_counts[step]++;
-                    if (task_counts[step] >= task_upperlimit) this.queues[step].CompleteAdding();
+                    task_step_done[step]++;
+                    if (task_step_done[step] >= total_task) this.queues[step].CompleteAdding();
                 }
                 if (step < 3) this.queues[step + 1].Add(task);
             }
