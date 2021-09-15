@@ -21,7 +21,7 @@ namespace AndyLuDemo
                 .WithDegreeOfParallelism(11)
                 .ForAll((task) =>
                 {
-                    
+
                     lock (_lock)
                     {
                         count += 1;
@@ -36,7 +36,7 @@ namespace AndyLuDemo
                     {
                         count -= 1;
                     }
-                    
+
                 });
         }
     }
@@ -49,6 +49,7 @@ namespace AndyLuDemo
             tasks.AsParallel().WithDegreeOfParallelism(5 + 3 + 3)
                 .ForAll((t) =>
                 {
+                    // Task 會自己維護一個Thread pool 有空閒就會接著做
                     Task.Run(() => { t.DoStepN(1); })
                         .ContinueWith((x) => { t.DoStepN(2); })
                         .ContinueWith((x) => { t.DoStepN(3); })
@@ -135,7 +136,6 @@ namespace AndyLuDemo
                         task_step_done[step] += 1;
                     }
                     if (step < 3) this.queues[step + 1].Enqueue(task);
-
                 }
             }
         }
@@ -292,6 +292,58 @@ namespace AndyLuDemo
             }
 
             foreach (var t in tasks_list) t.Wait();
+        }
+    }
+
+    public class AndyLuPipelineRunner6 : TaskRunnerBase
+    {
+        private ConcurrentQueue<MyTask>[] queues = new ConcurrentQueue<MyTask>[1 + 3] {
+            null,
+            new ConcurrentQueue<MyTask>(),
+            new ConcurrentQueue<MyTask>(),
+            new ConcurrentQueue<MyTask>()
+        };
+        private ManualResetEvent[] waithandles = new ManualResetEvent[1 + 3] {
+            null,
+            new ManualResetEvent(false),
+            new ManualResetEvent(false),
+            new ManualResetEvent(false)
+        };
+        private int totalTask;
+        private int[] taskDone = { 0, 0, 0, 0 };
+        private object _lock = new Object();
+        private void DoAllStep(int step)
+        {
+            while (this.waithandles[step].WaitOne()) // 等待開啟
+            {
+                if (this.queues[step].TryDequeue(out MyTask task))
+                {
+                    task.DoStepN(step);
+                    lock (_lock) taskDone[step]++;
+                    if (step < 3)
+                    {
+                        this.waithandles[step + 1].Set(); // 開啟下一個step 的訊號
+                        this.queues[step + 1].Enqueue(task);
+                    }
+                } else if (taskDone[step] >= totalTask) break; // 事情做完後要停止等待
+            }
+        }
+        public override void Run(IEnumerable<MyTask> tasks)
+        {
+            List<Task> taskPool = new List<Task>();
+            int[] counts = { 0, 5, 3, 3 };
+            foreach (var task in tasks) this.queues[1].Enqueue(task);
+            totalTask = this.queues[1].Count;
+            this.waithandles[1].Set();
+            Parallel.For(1, counts.Length, (step) =>
+            {
+                for (int i = 0; i < counts[step]; i++)
+                {
+                    Task t = Task.Run(() => { this.DoAllStep(step); });
+                    taskPool.Add(t);
+                }
+            });
+            foreach (var t in taskPool) t.Wait();
         }
     }
 }

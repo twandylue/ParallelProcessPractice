@@ -13,7 +13,7 @@ namespace AndyLuDemo
         {
             Console.WriteLine("Hello World!");
             TaskRunnerBase run = 
-                new AndyLuBasicTaskRunner1();
+                // new AndyLuBasicTaskRunner1();
                 // new AndyLuBasicTaskRunner2();
                 // new AndyLuTaskThreadRunner1();
                 // new AndyLuTaskThreadRunner2();
@@ -22,6 +22,7 @@ namespace AndyLuDemo
                 // new AndyLuPipelineRunner3();
                 // new AndyLuPipelineRunner4();
                 // new AndyLuPipelineRunner5();
+                new AndyLuPipelineRunner6();
             run.ExecuteTasks(30);
         }
     }
