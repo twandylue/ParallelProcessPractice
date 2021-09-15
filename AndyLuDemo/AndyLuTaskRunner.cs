@@ -322,6 +322,7 @@ namespace AndyLuDemo
                     lock (_lock) taskDone[step]++;
                     if (step < 3)
                     {
+                        if (this.waithandles[step + 1].WaitOne(0) == false) this.waithandles[step + 1].Set(); // 開啟下一個step 的訊號
                         this.waithandles[step + 1].Set(); // 開啟下一個step 的訊號
                         this.queues[step + 1].Enqueue(task);
                     }
