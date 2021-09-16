@@ -311,7 +311,7 @@ namespace AndyLuDemo
         };
         private int totalTask;
         private int[] taskDone = { 0, 0, 0, 0 };
-        private object _lock = new Object();
+        private object[] _locks = { null, new Object(), new Object(), new Object() };
         private void DoAllStep(int step)
         {
             while (this.waithandles[step].WaitOne()) // 等待開啟
@@ -319,14 +319,14 @@ namespace AndyLuDemo
                 if (this.queues[step].TryDequeue(out MyTask task))
                 {
                     task.DoStepN(step);
-                    lock (_lock) taskDone[step]++;
+                    lock (_locks[step]) taskDone[step]++;
                     if (step < 3)
                     {
                         if (this.waithandles[step + 1].WaitOne(0) == false) this.waithandles[step + 1].Set(); // 開啟下一個step 的訊號
-                        this.waithandles[step + 1].Set(); // 開啟下一個step 的訊號
                         this.queues[step + 1].Enqueue(task);
                     }
-                } else if (taskDone[step] >= totalTask) break; // 事情做完後要停止等待
+                }
+                else if (taskDone[step] >= totalTask) break; // 事情做完後要停止等待
             }
         }
         public override void Run(IEnumerable<MyTask> tasks)
@@ -335,7 +335,7 @@ namespace AndyLuDemo
             int[] counts = { 0, 5, 3, 3 };
             foreach (var task in tasks) this.queues[1].Enqueue(task);
             totalTask = this.queues[1].Count;
-            this.waithandles[1].Set();
+            this.waithandles[1].Set(); // 開始訊號
             Parallel.For(1, counts.Length, (step) =>
             {
                 for (int i = 0; i < counts[step]; i++)
