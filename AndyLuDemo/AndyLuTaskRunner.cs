@@ -365,14 +365,15 @@ namespace AndyLuDemo
             int[] counts = { 0, 5, 3, 3 }; // 併行數量限制
             foreach (var task in tasks) this._queues[1].EnTaskQueue(task);
             this._totalTask = this._queues[1].CountItem();
-            Parallel.For(1, counts.Length, (step) =>
+            for (int step = 1; step <= 3; step++)
             {
                 for (int i = 0; i < counts[step]; i++)
                 {
-                    Task t = Task.Run(() => { this.DoAllStep(step); });
+                    int index = step;
+                    Task t = Task.Run(() => { this.DoAllStep(index); });
                     taskPool.Add(t);
                 }
-            });
+            }
             foreach (var t in taskPool) t.Wait();
         }
         private void DoAllStep(int step)
