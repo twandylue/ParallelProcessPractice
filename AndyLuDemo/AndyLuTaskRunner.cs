@@ -415,7 +415,6 @@ namespace AndyLuDemo
                         return (false, finaltask);
                     }
                     return (true, default);
-                    // throw new Exception("TaskBlockQueueIsEmpty!"); // 終止
                 }
                 if (this._inner_concurrent_queue.TryDequeue(out T task))
                 {
