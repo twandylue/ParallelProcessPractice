@@ -377,20 +377,14 @@ namespace AndyLuDemo
         }
         private void DoAllStep(int step)
         {
-            try
+            while (true)
             {
-                while (true)
-                {
-                    MyTask task = this._queues[step].DeTaskQueue(); // 當_queue 沒項目可以處理的時候，這邊會等待(sleep waiting)
-                    task.DoStepN(step);
-                    lock (this._locks[step]) this._locks[step]["count"]++;
-                    if (step < 3) this._queues[step + 1].EnTaskQueue(task);
-                    if (this._locks[step]["count"] == this._totalTask) this._queues[step].Close();
-                }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine($"{step}: {e.Message}");
+                var (isShoutdown, task) = this._queues[step].DeTaskQueue(); // 當_queue 沒項目可以處理的時候，這邊會等待(sleep waiting)
+                if (isShoutdown) break;
+                task.DoStepN(step);
+                lock (this._locks[step]) this._locks[step]["count"]++;
+                if (step < 3) this._queues[step + 1].EnTaskQueue(task);
+                if (this._locks[step]["count"] == this._totalTask) this._queues[step].Close();
             }
         }
     }
@@ -410,7 +404,7 @@ namespace AndyLuDemo
             this._inner_concurrent_queue.Enqueue(item);
             this._dequeue_wait.Set();
         }
-        public T DeTaskQueue()
+        public (bool isShoutdown, T mytask) DeTaskQueue()
         {
             while (true)
             {
@@ -418,14 +412,15 @@ namespace AndyLuDemo
                 {
                     if (this._inner_concurrent_queue.TryDequeue(out T finaltask)) // 把剩餘的item 清空
                     {
-                        return finaltask;
+                        return (false, finaltask);
                     }
-                    throw new Exception("TaskBlockQueueIsEmpty!"); // 終止
+                    return (true, default);
+                    // throw new Exception("TaskBlockQueueIsEmpty!"); // 終止
                 }
                 if (this._inner_concurrent_queue.TryDequeue(out T task))
                 {
                     this._dequeue_wait.Reset();
-                    return task;
+                    return (false, task);
                 }
                 this._dequeue_wait.WaitOne(); // 等待
             }
