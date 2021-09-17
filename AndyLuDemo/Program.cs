@@ -22,7 +22,8 @@ namespace AndyLuDemo
                 // new AndyLuPipelineRunner3();
                 // new AndyLuPipelineRunner4();
                 // new AndyLuPipelineRunner5();
-                new AndyLuPipelineRunner6();
+                // new AndyLuPipelineRunner6();
+                new AndyLuPipelineRunner7();
             run.ExecuteTasks(30);
         }
     }

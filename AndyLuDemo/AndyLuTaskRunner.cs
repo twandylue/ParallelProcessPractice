@@ -196,7 +196,7 @@ namespace AndyLuDemo
         }
     }
 
-    // pipeline + counts(精準) + TPL + release list
+    // pipeline + counts(精準) + TPL + release
     public class AndyLuPipelineRunner4 : TaskRunnerBase
     {
         private BlockingCollection<MyTask>[] queues = new BlockingCollection<MyTask>[3 + 1] {
@@ -345,6 +345,99 @@ namespace AndyLuDemo
                 }
             });
             foreach (var t in taskPool) t.Wait();
+        }
+    }
+
+    // concurrentQueue + lock+ counter + TPL
+    public class AndyLuPipelineRunner7 : TaskRunnerBase
+    {
+        private TaskBlockQueue<MyTask>[] _queues = new TaskBlockQueue<MyTask>[1 + 3] {
+            null,
+            new TaskBlockQueue<MyTask>(),
+            new TaskBlockQueue<MyTask>(),
+            new TaskBlockQueue<MyTask>()
+        };
+        private int _totalTask;
+        private Dictionary<string, int>[] _locks = { null, new Dictionary<string, int>() { { "count", 0 } }, new Dictionary<string, int>() { { "count", 0 } }, new Dictionary<string, int>() { { "count", 0 } } };
+        public override void Run(IEnumerable<MyTask> tasks)
+        {
+            List<Task> taskPool = new List<Task>();
+            int[] counts = { 0, 5, 3, 3 }; // 併行數量限制
+            foreach (var task in tasks) this._queues[1].EnTaskQueue(task);
+            this._totalTask = this._queues[1].CountItem();
+            Parallel.For(1, counts.Length, (step) =>
+            {
+                for (int i = 0; i < counts[step]; i++)
+                {
+                    Task t = Task.Run(() => { this.DoAllStep(step); });
+                    taskPool.Add(t);
+                }
+            });
+            foreach (var t in taskPool) t.Wait();
+        }
+        private void DoAllStep(int step)
+        {
+            try
+            {
+                while (true)
+                {
+                    MyTask task = this._queues[step].DeTaskQueue(); // 當_queue 沒項目可以處理的時候，這邊會等待(sleep waiting)
+                    task.DoStepN(step);
+                    lock (this._locks[step]) this._locks[step]["count"]++;
+                    if (step < 3) this._queues[step + 1].EnTaskQueue(task);
+                    if (this._locks[step]["count"] == this._totalTask) this._queues[step].Close();
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"{step}: {e.Message}");
+            }
+        }
+    }
+
+    public class TaskBlockQueue<T>
+    {
+        private ConcurrentQueue<T> _inner_concurrent_queue = null;
+        private ManualResetEvent _dequeue_wait = null;
+        private bool _isShutdown = false;
+        public TaskBlockQueue()
+        {
+            this._inner_concurrent_queue = new ConcurrentQueue<T>();
+            this._dequeue_wait = new ManualResetEvent(false);
+        }
+        public void EnTaskQueue(T item)
+        {
+            this._inner_concurrent_queue.Enqueue(item);
+            this._dequeue_wait.Set();
+        }
+        public T DeTaskQueue()
+        {
+            while (true)
+            {
+                if (this._isShutdown)
+                {
+                    if (this._inner_concurrent_queue.TryDequeue(out T finaltask)) // 把剩餘的item 清空
+                    {
+                        return finaltask;
+                    }
+                    throw new Exception("TaskBlockQueueIsEmpty!"); // 終止
+                }
+                if (this._inner_concurrent_queue.TryDequeue(out T task))
+                {
+                    this._dequeue_wait.Reset();
+                    return task;
+                }
+                this._dequeue_wait.WaitOne(); // 等待
+            }
+        }
+        public void Close()
+        {
+            this._isShutdown = true;
+            this._dequeue_wait.Set();
+        }
+        public int CountItem()
+        {
+            return this._inner_concurrent_queue.Count;
         }
     }
 }
